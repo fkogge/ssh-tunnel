@@ -49,7 +49,7 @@ public class SshIfyApplication {
             session.connect();
             System.out.println("ssh - connected");
 
-            String[] commands = {"ls", "javac Hello.java", "java Hello"};
+            String[] commands = {"ls"};
 
             for (String command : commands) {
                 channel = (ChannelExec) session.openChannel("exec");
