@@ -1,6 +1,7 @@
 package com.example.sshify;
 
 import com.jcraft.jsch.*;
+import org.springframework.aop.aspectj.AspectJPrecedenceInformation;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.http.HttpStatus;
@@ -9,8 +10,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
+import java.io.*;
 
 
 @SpringBootApplication
@@ -94,5 +96,77 @@ public class SshIfyApplication {
         }
 
         return new ResponseEntity<>(output.toString(), HttpStatus.OK);
+    }
+
+    @PostMapping(
+            value = "/evaluate",
+            produces = { "application/json" },
+            consumes = { "multipart/form-data" }
+    )
+    public ResponseEntity<ApiResponse> compileCodeFile(@RequestParam("file") MultipartFile file) {
+        String fileName = file.getOriginalFilename();
+        if (!file.isEmpty()) {
+
+            try {
+                byte[] bytes = file.getBytes();
+                FileOutputStream fos = new FileOutputStream(fileName);
+                fos.write(bytes);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        String[] commands = {"g++",  fileName};
+        ProcessBuilder processBuilder = new ProcessBuilder(commands);
+        processBuilder.redirectErrorStream(true);
+        StringBuilder output = new StringBuilder();
+        boolean compileSuccess = false;
+
+        try {
+            Process process = processBuilder.start();
+            process.waitFor();
+            compileSuccess = process.exitValue() == 0;
+            BufferedReader inputReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = inputReader.readLine()) != null) {
+                System.out.println(line);
+                output.append(line);
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        if (compileSuccess) {
+            output.append("Your program compiled successfully!");
+        }
+
+        ApiResponse response = new ApiResponse(compileSuccess, output.toString());
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    private class ApiResponse {
+        boolean success;
+        String output;
+        ApiResponse(boolean success, String output) {
+            this.success = success;
+            this.output = output;
+        }
+
+        public String getOutput() {
+            return output;
+        }
+
+        public void setOutput(String output) {
+            this.output = output;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void setSuccess(boolean success) {
+            this.success = success;
+        }
     }
 }
